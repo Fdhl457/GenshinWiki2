@@ -666,7 +666,7 @@ fun CatalogueScreen(
                     containerColor = Color.White
                 ) {
                     FavoritesMenu(
-                        favoriteCharacters = favorites.map { bookmark ->
+                        favoriteCharacters = favorites.filter { !hiddenIds.contains(it.catalogId) }.map { bookmark ->
                             CharacterDetail(
                                 id = bookmark.catalogId,
                                 name = bookmark.title,
@@ -883,14 +883,15 @@ fun CharacterItem(
                             modifier = Modifier.weight(1f)
                         )
                         Row {
-                            IconButton(onClick = { viewModel.toggleBookmark(character) }) {
-                                Icon(
-                                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                    contentDescription = null,
-                                    tint = if (isFavorite) Color.Red else Color(0xFF5A5F3A)
-                                )
+                            if (!isHidden) {
+                                IconButton(onClick = { viewModel.toggleBookmark(character) }) {
+                                    Icon(
+                                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                        contentDescription = null,
+                                        tint = if (isFavorite) Color.Red else Color(0xFF5A5F3A)
+                                    )
+                                }
                             }
-
                         }
                     }
                     Text(
