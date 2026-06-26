@@ -524,7 +524,7 @@ fun CatalogueScreen(
             containerColor = Color(0xFFFAF1EC),
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("GENSHIN WIKI", color = Color.Black) },
+                    title = { Text("GENSHIN WIKI", color = Color.Black, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { 
                             scope.launch { drawerState.open() }
