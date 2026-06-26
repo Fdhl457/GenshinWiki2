@@ -6,9 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.genshin.data.local.database.AppDatabase
 import com.example.genshin.data.local.entity.User
 import com.example.genshin.data.pref.AuthDataStore
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
@@ -17,6 +21,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
     val authState: StateFlow<AuthState> = _authState
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val currentUser: Flow<User?> = authDataStore.userId.flatMapLatest { userId ->
+        if (userId != null) {
+            db.userDao().getUserById(userId)
+        } else {
+            emptyFlow()
+        }
+    }
 
     init {
         checkLoginStatus()

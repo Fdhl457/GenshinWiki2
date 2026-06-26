@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.TextUnit
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import com.example.genshin.data.local.entity.User
 import com.example.genshin.viewmodel.AuthState
 import com.example.genshin.viewmodel.AuthViewModel
@@ -119,6 +120,7 @@ fun CatalogApp(
                             when (selectedTab) {
                                 0 -> CatalogueScreen(
                                     viewModel = genshinViewModel,
+                                    authViewModel = authViewModel,
                                     onViewDetail = { character ->
                                         selectedCharacter = character
                                         currentScreen = "detail"
@@ -127,7 +129,7 @@ fun CatalogApp(
                                 1 -> SettingScreen(
                                     isLoggedIn = true,
                                     onLoginClick = { /* Already logged in */ },
-                                    onLogoutClick = { 
+                                    onLogoutClick = {
                                         authViewModel.logout()
                                         currentScreen = "login"
                                     },
@@ -148,16 +150,20 @@ fun CatalogApp(
 
 @Composable
 fun SplashScreen() {
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFAF1EC)), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFAF1EC)),
+        contentAlignment = Alignment.Center
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                Icons.Default.AutoAwesome, 
-                contentDescription = null, 
-                modifier = Modifier.size(100.dp),
-                tint = Color(0xFFF6F9E4)
+            AsyncImage(
+                model = R.drawable.splash,
+                contentDescription = "Genshin Splash",
+                modifier = Modifier.size(200.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            CircularProgressIndicator(color = Color(0xFFF6F9E4))
+            CircularProgressIndicator(color = Color(0xFFC7B468))
         }
     }
 }
@@ -418,7 +424,11 @@ enum class SortOrder {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CatalogueScreen(viewModel: GenshinViewModel, onViewDetail: (CharacterDetail) -> Unit) {
+fun CatalogueScreen(
+    viewModel: GenshinViewModel,
+    authViewModel: AuthViewModel,
+    onViewDetail: (CharacterDetail) -> Unit
+) {
     var searchQuery by remember { mutableStateOf("") }
     val products = viewModel.charactersList
     
@@ -426,6 +436,9 @@ fun CatalogueScreen(viewModel: GenshinViewModel, onViewDetail: (CharacterDetail)
     val sheetState = rememberModalBottomSheetState()
     var sortOrder by remember { mutableStateOf(SortOrder.AtoZ) }
     var isSortMenuExpanded by remember { mutableStateOf(false) }
+    var showUserInfoDialog by remember { mutableStateOf(false) }
+
+    val user by authViewModel.currentUser.collectAsState(initial = null)
 
     val sortedProducts = remember(products, searchQuery, sortOrder) {
         val filtered = products.filter { it.name.contains(searchQuery, ignoreCase = true) }
@@ -435,166 +448,272 @@ fun CatalogueScreen(viewModel: GenshinViewModel, onViewDetail: (CharacterDetail)
         }
     }
 
-    Scaffold(
-        containerColor = Color(0xFFFAF1EC),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Genshin WIKI", color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
-                    }
-                },
-                actions = {
-                    Box {
-                        IconButton(onClick = { isSortMenuExpanded = true }) {
-                            Icon(Icons.Default.FilterList, contentDescription = "Sort", tint = Color.White)
-                        }
-                        DropdownMenu(
-                            expanded = isSortMenuExpanded,
-                            onDismissRequest = { isSortMenuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Name: A-Z") },
-                                onClick = {
-                                    sortOrder = SortOrder.AtoZ
-                                    isSortMenuExpanded = false
-                                },
-                                leadingIcon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Name: Z-A") },
-                                onClick = {
-                                    sortOrder = SortOrder.ZtoA
-                                    isSortMenuExpanded = false
-                                },
-                                leadingIcon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) }
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFC7B468)
-                )
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showFavoritesSheet = true },
-                containerColor = Color(0xFFF6F9E4),
-                contentColor = Color(0xFF3D402B),
-                shape = RoundedCornerShape(28.dp)
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = Color.White
             ) {
-                Icon(Icons.Default.Favorite, contentDescription = "Favorite")
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Genshin Wiki Menu",
+                    modifier = Modifier.padding(16.dp),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF5A5F3A)
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                NavigationDrawerItem(
+                    label = { Text("Profile Info") },
+                    selected = false,
+                    onClick = {
+                        showUserInfoDialog = true
+                        scope.launch { drawerState.close() }
+                    },
+                    icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedIconColor = Color(0xFF5A5F3A),
+                        unselectedTextColor = Color(0xFF5A5F3A)
+                    )
+                )
+
+                NavigationDrawerItem(
+                    label = { Text("Exit Application") },
+                    selected = false,
+                    onClick = {
+                        (context as? android.app.Activity)?.finish()
+                    },
+                    icon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedIconColor = Color(0xFF5A5F3A),
+                        unselectedTextColor = Color(0xFF5A5F3A)
+                    )
+                )
             }
         }
-    ) { padding ->
-        if (viewModel.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFF6F9E4))
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                // Search Bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search Character") },
-                    trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFFF5F5F5),
-                        focusedContainerColor = Color(0xFFF5F5F5),
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent
+    ) {
+        Scaffold(
+            containerColor = Color(0xFFFAF1EC),
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("GENSHIN WIKI", color = Color.Black) },
+                    navigationIcon = {
+                        IconButton(onClick = { 
+                            scope.launch { drawerState.open() }
+                        }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.Black)
+                        }
+                    },
+                    actions = {
+                        Box {
+                            IconButton(onClick = { isSortMenuExpanded = true }) {
+                                Icon(Icons.Default.FilterList, contentDescription = "Sort", tint = Color.Black)
+                            }
+                            DropdownMenu(
+                                expanded = isSortMenuExpanded,
+                                onDismissRequest = { isSortMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Name: A-Z") },
+                                    onClick = {
+                                        sortOrder = SortOrder.AtoZ
+                                        isSortMenuExpanded = false
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Name: Z-A") },
+                                    onClick = {
+                                        sortOrder = SortOrder.ZtoA
+                                        isSortMenuExpanded = false
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) }
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color(0xFFC7B468)
                     )
                 )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Recent Added Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { showFavoritesSheet = true },
+                    containerColor = Color(0xFFF6F9E4),
+                    contentColor = Color(0xFF3D402B),
+                    shape = RoundedCornerShape(28.dp)
                 ) {
-                    Text(
-                        text = "Genshin Characters",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color(0xFF5A5F3A))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(Icons.Default.GridView, contentDescription = null, tint = Color.LightGray)
-                    }
+                    Icon(Icons.Default.Favorite, contentDescription = "Favorite")
                 }
+            }
+        ) { padding ->
+            if (viewModel.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFFF6F9E4))
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    // Search Bar
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Search Character") },
+                        trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = Color(0xFFF5F5F5),
+                            focusedContainerColor = Color(0xFFF5F5F5),
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = Color.Transparent
+                        )
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                // Product List
-                if (sortedProducts.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center
+                    // Recent Added Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("No characters found", color = Color.Gray)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = { viewModel.fetchCharactersList() }) {
-                                Text("Retry")
+                        Text(
+                            text = "Genshin Characters",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row {
+                            Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color(0xFF5A5F3A))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Default.GridView, contentDescription = null, tint = Color.LightGray)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Product List
+                    if (sortedProducts.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("No characters found", color = Color.Gray)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(onClick = { viewModel.fetchCharactersList() }) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(sortedProducts) { character ->
+                                CharacterItem(
+                                    character = character,
+                                    viewModel = viewModel,
+                                    onViewDetail = { onViewDetail(character) }
+                                )
                             }
                         }
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(sortedProducts) { character ->
-                            CharacterItem(
-                                character = character,
-                                viewModel = viewModel,
-                                onViewDetail = { onViewDetail(character) }
+                }
+            }
+
+            if (showFavoritesSheet) {
+                val favorites by viewModel.bookmarkedCharacters.collectAsState(emptyList())
+                ModalBottomSheet(
+                    onDismissRequest = { showFavoritesSheet = false },
+                    sheetState = sheetState,
+                    containerColor = Color.White
+                ) {
+                    FavoritesMenu(
+                        favoriteCharacters = favorites.map { bookmark ->
+                            CharacterDetail(
+                                id = bookmark.catalogId,
+                                name = bookmark.title,
+                                description = "Bookmarked"
                             )
+                        },
+                        viewModel = viewModel,
+                        onViewDetail = {
+                            onViewDetail(it)
+                            showFavoritesSheet = false
                         }
-                    }
+                    )
                 }
             }
         }
-
-        if (showFavoritesSheet) {
-            val favorites by viewModel.bookmarkedCharacters.collectAsState(emptyList())
-            ModalBottomSheet(
-                onDismissRequest = { showFavoritesSheet = false },
-                sheetState = sheetState,
-                containerColor = Color.White
-            ) {
-                FavoritesMenu(
-                    favoriteCharacters = favorites.map { bookmark ->
-                        CharacterDetail(
-                            id = bookmark.catalogId,
-                            name = bookmark.title,
-                            description = "Bookmarked"
-                        )
-                    },
-                    viewModel = viewModel,
-                    onViewDetail = {
-                        onViewDetail(it)
-                        showFavoritesSheet = false
-                    }
-                )
-            }
-        }
     }
+
+    if (showUserInfoDialog && user != null) {
+        UserInfoDialog(user = user!!, onDismiss = { showUserInfoDialog = false })
+    }
+}
+
+@Composable
+fun UserInfoDialog(user: User, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = Color(0xFFC7B468))
+            }
+        },
+        title = {
+            Text(text = "User Profile", fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = Color(0xFF5A5F3A)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = user.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = Color(0xFF5A5F3A)
+                        )
+                        Text(
+                            text = "Authenticated User",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                DetailRow(label = "Name", value = user.name)
+                DetailRow(label = "Email", value = user.email)
+                DetailRow(label = "User ID", value = "#${user.id}")
+            }
+        },
+        containerColor = Color.White,
+        shape = RoundedCornerShape(20.dp)
+    )
 }
 
 @Composable
@@ -842,9 +961,9 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp
                 )
-                Text(text = "Name: [Your Name]", fontSize = 14.sp)
-                Text(text = "Email: developer@example.com", fontSize = 14.sp)
-                Text(text = "GitHub: github.com/yourusername", fontSize = 14.sp)
+                Text(text = "Name: Fadhel Ibnu Yupardi", fontSize = 14.sp)
+                Text(text = "Email: fadhelibnuyupardi20@gmail.com", fontSize = 14.sp)
+                Text(text = "GitHub: github.com/fdhl457", fontSize = 14.sp)
             }
         },
         containerColor = Color.White,
