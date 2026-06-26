@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.genshin.data.local.database.AppDatabase
 import com.example.genshin.data.local.entity.Bookmarked
+import com.example.genshin.data.local.entity.HiddenCharacter
 import com.example.genshin.data.pref.AuthDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -38,6 +39,15 @@ class GenshinViewModel(application: Application) : AndroidViewModel(application)
     val bookmarkedCharacters: Flow<List<Bookmarked>> = authDataStore.userId.flatMapLatest { userId ->
         if (userId != null) {
             db.bookmarkedDao().getBookmarksByUser(userId)
+        } else {
+            emptyFlow()
+        }
+    }
+
+    // Flow untuk karakter yang di-hide oleh user saat ini
+    val hiddenCharacters: Flow<List<HiddenCharacter>> = authDataStore.userId.flatMapLatest { userId ->
+        if (userId != null) {
+            db.hiddenDao().getHiddenCharactersByUser(userId)
         } else {
             emptyFlow()
         }
@@ -100,6 +110,36 @@ class GenshinViewModel(application: Application) : AndroidViewModel(application)
         return authDataStore.userId.flatMapLatest { userId ->
             if (userId != null) {
                 db.bookmarkedDao().isBookmarked(userId, characterId)
+            } else {
+                emptyFlow()
+            }
+        }
+    }
+
+    // Menambah/menghapus hide
+    fun toggleHide(characterId: String) {
+        viewModelScope.launch {
+            val userId = authDataStore.userId.first() ?: return@launch
+            val isCurrentlyHidden = db.hiddenDao().isHidden(userId, characterId).first()
+
+            if (isCurrentlyHidden) {
+                db.hiddenDao().removeHiddenCharacter(userId, characterId)
+            } else {
+                db.hiddenDao().addHiddenCharacter(
+                    HiddenCharacter(
+                        userId = userId,
+                        characterId = characterId
+                    )
+                )
+            }
+        }
+    }
+
+    // Mengecek apakah karakter di-hide
+    fun isCharacterHidden(characterId: String): Flow<Boolean> {
+        return authDataStore.userId.flatMapLatest { userId ->
+            if (userId != null) {
+                db.hiddenDao().isHidden(userId, characterId)
             } else {
                 emptyFlow()
             }

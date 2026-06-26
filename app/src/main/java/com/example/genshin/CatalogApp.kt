@@ -433,15 +433,20 @@ fun CatalogueScreen(
     val products = viewModel.charactersList
     
     var showFavoritesSheet by remember { mutableStateOf(false) }
+    var showHiddenSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     var sortOrder by remember { mutableStateOf(SortOrder.AtoZ) }
     var isSortMenuExpanded by remember { mutableStateOf(false) }
     var showUserInfoDialog by remember { mutableStateOf(false) }
 
     val user by authViewModel.currentUser.collectAsState(initial = null)
+    val hiddenChars by viewModel.hiddenCharacters.collectAsState(emptyList())
+    val hiddenIds = remember(hiddenChars) { hiddenChars.map { it.characterId }.toSet() }
 
-    val sortedProducts = remember(products, searchQuery, sortOrder) {
-        val filtered = products.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    val sortedProducts = remember(products, searchQuery, sortOrder, hiddenIds) {
+        val filtered = products.filter { 
+            it.name.contains(searchQuery, ignoreCase = true) && !hiddenIds.contains(it.id) 
+        }
         when (sortOrder) {
             SortOrder.AtoZ -> filtered.sortedBy { it.name }
             SortOrder.ZtoA -> filtered.sortedByDescending { it.name }
@@ -477,6 +482,21 @@ fun CatalogueScreen(
                         scope.launch { drawerState.close() }
                     },
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedIconColor = Color(0xFF5A5F3A),
+                        unselectedTextColor = Color(0xFF5A5F3A)
+                    )
+                )
+
+                NavigationDrawerItem(
+                    label = { Text("Hidden Characters") },
+                    selected = false,
+                    onClick = {
+                        showHiddenSheet = true
+                        scope.launch { drawerState.close() }
+                    },
+                    icon = { Icon(Icons.Default.VisibilityOff, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = 12.dp),
                     colors = NavigationDrawerItemDefaults.colors(
                         unselectedIconColor = Color(0xFF5A5F3A),
@@ -661,6 +681,23 @@ fun CatalogueScreen(
                     )
                 }
             }
+
+            if (showHiddenSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showHiddenSheet = false },
+                    sheetState = sheetState,
+                    containerColor = Color.White
+                ) {
+                    HiddenMenu(
+                        hiddenCharacters = products.filter { hiddenIds.contains(it.id) },
+                        viewModel = viewModel,
+                        onViewDetail = {
+                            onViewDetail(it)
+                            showHiddenSheet = false
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -759,12 +796,55 @@ fun FavoritesMenu(
 }
 
 @Composable
+fun HiddenMenu(
+    hiddenCharacters: List<CharacterDetail>,
+    viewModel: GenshinViewModel,
+    onViewDetail: (CharacterDetail) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 32.dp)
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Hidden Characters",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        if (hiddenCharacters.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No hidden characters", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(hiddenCharacters) { character ->
+                    CharacterItem(
+                        character = character,
+                        viewModel = viewModel,
+                        onViewDetail = { onViewDetail(character) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun CharacterItem(
     character: CharacterDetail,
     viewModel: GenshinViewModel,
     onViewDetail: () -> Unit
 ) {
     val isFavorite by viewModel.isCharacterBookmarked(character.id).collectAsState(false)
+    val isHidden by viewModel.isCharacterHidden(character.id).collectAsState(false)
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
@@ -833,12 +913,12 @@ fun CharacterItem(
                     Text("View Catalogue")
                 }
                 Button(
-                    onClick = { viewModel.toggleBookmark(character) },
+                    onClick = { viewModel.toggleHide(character.id) },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFAF1EC), contentColor = Color(0xFF5A5F3A))
                 ) {
-                    Text("Remove Bookmark")
+                    Text(if (isHidden) "Unhide" else "Hide")
                 }
             }
         }

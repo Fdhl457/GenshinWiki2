@@ -38,9 +38,18 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private fun checkLoginStatus() {
         viewModelScope.launch {
             val isLoggedIn = authDataStore.isLoggedIn.first()
-            if (isLoggedIn) {
+            val userId = authDataStore.userId.first()
+            
+            val userExists = if (userId != null) {
+                db.userDao().getUserById(userId).first() != null
+            } else {
+                false
+            }
+
+            if (isLoggedIn && userExists) {
                 _authState.value = AuthState.Authenticated
             } else {
+                if (isLoggedIn) authDataStore.clearSession()
                 _authState.value = AuthState.Unauthenticated
             }
         }
