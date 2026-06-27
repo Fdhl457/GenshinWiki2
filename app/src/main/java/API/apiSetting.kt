@@ -67,11 +67,20 @@ class GenshinViewModel(application: Application) : AndroidViewModel(application)
                 val details = ids.map { id ->
                     async {
                         try {
-                            // Map ID ke dalam objek detail agar kita tahu ID-nya
-                            GenshinApiClient.service.getCharacterDetail(id).copy(id = id)
+                            val detail = GenshinApiClient.service.getCharacterDetail(id)
+                            // Pastikan ID disuntikkan ke model agar gambar Coil di UI bisa memuat URL-nya dengan benar
+                            detail.copy(id = id)
                         } catch (e: Exception) {
-                            // Fallback jika detail gagal diambil
-                            CharacterDetail(id = id, name = id.replaceFirstChar { it.uppercase() })
+                            e.printStackTrace()
+                            // Jika satu karakter gagal (misal datanya corrupt di API), buatkan data tiruan mini agar katalog tidak hilang sepenuhnya
+                            CharacterDetail(
+                                id = id,
+                                name = id.replaceFirstChar { it.uppercase() },
+                                vision = "Unknown",
+                                weapon = "Unknown",
+                                nation = "Unknown",
+                                description = "No data available",
+                            )
                         }
                     }
                 }.awaitAll()

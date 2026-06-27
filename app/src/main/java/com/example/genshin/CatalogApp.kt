@@ -62,7 +62,7 @@ fun CatalogApp(
         is AuthState.Unauthenticated -> {
             if (currentScreen == "register") {
                 RegisterScreen(
-                    onRegisterSuccess = { 
+                    onRegisterSuccess = {
                         currentScreen = "login"
                     },
                     onLoginClick = { currentScreen = "login" },
@@ -70,7 +70,7 @@ fun CatalogApp(
                 )
             } else {
                 LoginScreen(
-                    onLoginSuccess = { 
+                    onLoginSuccess = {
                         // Handled by AuthViewModel state
                     },
                     onRegisterClick = { currentScreen = "register" },
@@ -199,7 +199,17 @@ fun CharacterDetailScreen(character: CharacterDetail?, onBack: () -> Unit) {
                         .fillMaxWidth()
                         .height(300.dp)
                         .background(Color(0xFFF6F9E4).copy(alpha = 0.1f)),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Fit
+                )
+
+                AsyncImage(
+                    model = "https://genshin.jmp.blue/characters/${character.id}/constellation-shape",
+                    contentDescription = character.name,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .background(Color(0xFFF6F9E4).copy(alpha = 0.1f)),
+                    contentScale = ContentScale.Fit
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))

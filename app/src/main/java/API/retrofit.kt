@@ -7,6 +7,7 @@ import kotlinx.serialization.json.Json
 import retrofit2.Retrofit
 import retrofit2.http.GET
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 // Model untuk Detail Karakter
 @Serializable
@@ -17,12 +18,12 @@ data class CharacterDetail(
     val weapon: String = "",
     val nation: String = "",
     val description: String = "",
-    val rarity: Int = 0
+    val rarity: String = "4"
 )
 
 interface GenshinApiService {
     // Endpoint mendapatkan list semua ID karakter
-    @GET("characters")
+    @GET("characters/")
     suspend fun getCharacterList(): List<String>
 
     // Endpoint mendapatkan detail satu karakter
